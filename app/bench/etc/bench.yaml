@@ -1,0 +1,13 @@
+Name: "bench.rpc"
+ListenOn: "0.0.0.0:8080"
+Mode: "test"
+Verbose: true
+Timeout: 0
+Prometheus:
+  Host: "0.0.0.0"
+  Port: 9101
+  Path: "/metrics"
+Log:
+  Mode: "file"
+  Path: "logs"
+  Level: "info"

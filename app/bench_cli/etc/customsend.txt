@@ -1,0 +1,3 @@
+#  自定义消息发送
+custom.xxxxx.xxxx
+{"xxxxx":"xxxxxxx"}

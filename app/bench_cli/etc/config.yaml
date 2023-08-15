@@ -1,0 +1,11 @@
+# 压测机器地址
+WorksAddr:
+  - "0.0.0.0:8080"
+  - "0.0.0.0:8081"
+
+# pomelo 压测地址
+PomeloAddress: "ws://localhost:443"
+
+# 自定义压测消息内容
+CustomSendFiles:
+  - "etc/customsend.txt"

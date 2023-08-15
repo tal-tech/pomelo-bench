@@ -1,0 +1,213 @@
+syntax = "proto3";
+
+package bench;
+option go_package = "./bench";
+
+// 任务分发管理
+service Bench {
+
+  // StartPlan 启动压测
+  rpc StartPlan(StartPlanRequest) returns (StartPlanResponse) {}
+  // SendChat 发送消息
+  rpc SendChat(SendChatRequest) returns (SendChatResponse) {}
+  // CustomSend 自定义消息发送
+  rpc CustomSend(CustomSendRequest) returns (CustomSendResponse) {}
+  // ClosePlan 清理任务
+  rpc ClosePlan(ClosePlanRequest) returns (ClosePlanResponse) {}
+
+  // ListPlan 查询压测计划
+  rpc ListPlan(ListPlanRequest) returns (ListPlanResponse) {}
+  // DetailPlan 查询压测计划详情
+  rpc DetailPlan(DetailPlanRequest) returns (DetailPlanResponse) {}
+}
+
+
+// 任务状态
+enum Status {
+  Waiting = 0;
+  Doing = 1;
+  Success = 2;
+  Failed = 3;
+}
+
+// 统计信息
+message Statistics {
+  // 发送量
+  uint64 send_count = 1;
+  // 自定义发送量
+  uint64 custom_send_count = 2;
+  // 接收量
+  uint64 on_server_receive_count = 3;
+  uint64 on_add_receive_count = 4;
+  uint64 on_leave_receive_count = 5;
+  uint64 on_chat_receive_count = 6;
+  // 总在线人数
+  uint64 online_num = 7;
+}
+
+// 指标统计
+message Metrics {
+  uint64 drops = 1;
+  float average = 2;
+  float median = 3;
+  float top90th = 4;
+  float top99th = 5;
+  float top99p9th = 6;
+}
+
+
+message Plan {
+  // uid 自增base
+  uint64 base_uid = 1;
+  // 房间连接数
+  uint64 room_number = 2;
+  // room id 前缀
+  string room_id_pre = 3;
+  // room id 前缀
+  uint64 room_size = 4;
+
+  // 压测地址
+  string address = 5;
+  // channel id
+  uint64 channel_id = 6;
+}
+
+// Connector 客户端链接情况
+message ConnectorStatus {
+  // gate 连接总数
+  uint64 gate_connector = 1;
+  // chat 连接总数
+  uint64 chat_connector = 2;
+}
+
+// 连接状态
+message Connector {
+  int64 uid = 1;
+  int64 channel_id = 2;
+  string room_id = 3;
+
+  // 总统计信息
+  Statistics total = 4;
+
+  PomeloConnector pomelo_gate = 5;
+  PomeloConnector pomelo_chat = 6;
+}
+
+message ConnectorLog {
+  string event = 1;
+  repeated string Logs = 2;
+}
+
+message PomeloConnector {
+  bool connected = 1;
+  string address = 2;
+  uint64 reqId = 3;
+}
+
+
+// PlanDetail 计划运行详情
+message PlanDetail {
+  // 计划配置
+  Plan plan = 2;
+  // 连接器详情
+  repeated Connector connectors = 3;
+}
+
+// StartPlan 快速启动压测
+message StartPlanRequest {
+  Plan plan = 1;
+}
+
+// StartPlanResponse 与详情返回一致
+message StartPlanResponse {
+  // 计划uid
+  string uuid = 1;
+  PlanDetail detail = 2;
+  // 计划状态
+  Status status = 3;
+}
+
+// SendChat 快速发送消息
+message SendChatRequest {
+  // 计划uid 选填没有代表全部
+  optional string uuid = 1;
+  // 发送的消息
+  string message = 2;
+  // 发送次数
+  uint64 number = 3;
+  // 发送人数限制
+  uint64 limit = 4;
+  // 发送间隔 毫秒
+  uint64 duration = 5;
+}
+
+message SendChatResponse {}
+
+
+// CustomSend 自定义消息发送
+message CustomSendRequest {
+  // 计划uid 选填没有代表全部
+  optional string uuid = 1;
+  // 自定义消息池 - 不同的client从池中挑选自己的消息
+  CustomMessagePool pool = 2;
+  // 发送次数
+  uint64 number = 3;
+  // 发送人数限制
+  uint64 limit = 4;
+  // 发送间隔 毫秒
+  uint64 duration = 5;
+}
+
+// 自定义消息池
+message CustomMessagePool {
+  // 消息对应的路由
+  string router = 1;
+  // 发送的消息信息
+  repeated bytes data = 2;
+}
+
+
+message CustomSendResponse {}
+
+// ClosePlan 快速清理任务
+message ClosePlanRequest {
+  // 计划uid 选填没有代表全部
+  optional string uuid = 1;
+}
+
+message ClosePlanResponse {}
+
+
+// ListPlan 查询压测计划
+message ListPlanRequest {}
+
+message ListPlanResponse {
+  repeated PlanMonitor plans = 1;
+}
+
+message PlanMonitor {
+  string uuid = 1;
+  Plan plan = 2;
+  Status status = 3;
+
+  // Connector 客户端链接情况
+  ConnectorStatus connector = 4;
+  // 总统计信息
+  Statistics total = 5;
+  // 指标统计
+  Metrics stat = 6;
+}
+
+// DetailPlan 查询压测计划详情
+message DetailPlanRequest {
+  string uuid = 1;
+}
+
+message DetailPlanResponse {
+  // 计划uid
+  string uuid = 1;
+  PlanDetail detail = 2;
+  // 计划状态
+  Status status = 3;
+}
+
