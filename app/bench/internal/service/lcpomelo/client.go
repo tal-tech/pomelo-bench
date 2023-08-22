@@ -98,12 +98,12 @@ func NewClientConnector(addr string, uid int, channelId int, roomId string) *Cli
 }
 
 // RunGateConnectorAndWaitConnect 初始化GateConnector握手
-func (c *ClientConnector) RunGateConnectorAndWaitConnect(ctx context.Context) error {
+func (c *ClientConnector) RunGateConnectorAndWaitConnect(ctx context.Context, timeout time.Duration) error {
 	if !c.pomeloGateConnectorConnected {
 
-		err := c.runAndWaitConnect(ctx, c.pomeloGateConnector, c.pomeloGateAddress, nil)
+		err := c.runAndWaitConnect(ctx, c.pomeloGateConnector, c.pomeloGateAddress, timeout, nil)
 		if err != nil {
-			return err
+			return errors.New(fmt.Sprintf("GateConnector tailed, %s", err.Error()))
 		}
 
 		c.pomeloGateConnectorConnected = true
@@ -113,21 +113,21 @@ func (c *ClientConnector) RunGateConnectorAndWaitConnect(ctx context.Context) er
 }
 
 // RunChatConnectorAndWaitConnect 初始化GateConnector握手
-func (c *ClientConnector) RunChatConnectorAndWaitConnect(ctx context.Context) error {
+func (c *ClientConnector) RunChatConnectorAndWaitConnect(ctx context.Context, timeout time.Duration) error {
 	if c.pomeloChatAddress == "" {
 		return errors.New("invalid pomelo chat address")
 	}
 
 	if !c.pomeloChatConnectorConnected {
 
-		err := c.runAndWaitConnect(ctx, c.pomeloChatConnector, c.pomeloChatAddress, func(message string) {
+		err := c.runAndWaitConnect(ctx, c.pomeloChatConnector, c.pomeloChatAddress, timeout, func(message string) {
 
 			c.pomeloChatConnectorConnected = false
 
 			logx.Error("chat connector failed, err:", message)
 		})
 		if err != nil {
-			return err
+			return errors.New(fmt.Sprintf("ChatConnector tailed, %s", err.Error()))
 		}
 
 		c.pomeloChatConnectorConnected = true

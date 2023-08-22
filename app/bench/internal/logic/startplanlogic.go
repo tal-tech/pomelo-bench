@@ -6,6 +6,7 @@ import (
 	"pomelo_bench/app/bench/internal/logic/transform"
 	"pomelo_bench/app/bench/internal/svc"
 	"pomelo_bench/pb/bench"
+	"time"
 )
 
 type StartPlanLogic struct {
@@ -32,18 +33,10 @@ func (l *StartPlanLogic) StartPlan(in *bench.StartPlanRequest) (*bench.StartPlan
 		return nil, err
 	}
 
-	l.Info("创建任务成功,准备通过网关链接获取chat地址")
+	l.Info("创建任务成功,准备通过网关链接获取chat地址并进入chat房间")
 
-	// 通过网关链接获取chat地址
-	err = plan.PlanQueryGate(l.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	l.Info("通过网关链接获取chat地址成功,准备进入chat房间")
-
-	// 进入chat房间
-	err = plan.PlanConnectEntry(l.ctx)
+	// 通过网关链接获取chat地址 and  进入chat房间
+	err = plan.PlanQueryGateAndEnter(l.ctx, time.Duration(in.Plan.Timeout)*time.Second)
 	if err != nil {
 		return nil, err
 	}

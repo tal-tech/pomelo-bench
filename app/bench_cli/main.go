@@ -38,6 +38,10 @@ func main() {
 	// 连接上woker机器
 	connectWorker(c.WorksAddr)
 
+	pterm.DefaultSection.Println("bench_cli version 1.3")
+	pterm.DefaultSection.Println(fmt.Sprintf("bench_cli Timeout %d", c.Timeout))
+	pterm.DefaultSection.Println(fmt.Sprintf("Address %s", c.PomeloAddress))
+
 	for !exit {
 
 		menu()
@@ -51,10 +55,11 @@ func menu() {
 
 	options := []string{
 		"connect",
+		"tree",
 		"send",
 		"recover",
+		"clear",
 		"close",
-		"tree",
 		"quit",
 	}
 
@@ -64,6 +69,10 @@ func menu() {
 	if selectedOption == "connect" {
 
 		connect()
+
+	} else if selectedOption == "tree" {
+
+		monitorTree()
 
 	} else if selectedOption == "send" {
 
@@ -77,9 +86,9 @@ func menu() {
 
 		closePlan()
 
-	} else if selectedOption == "tree" {
+	} else if selectedOption == "clear" {
 
-		monitorTree()
+		clear()
 
 	} else if selectedOption == "quit" {
 

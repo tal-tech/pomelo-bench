@@ -25,29 +25,9 @@ func NewSendChatLogic(ctx context.Context, svcCtx *svc.ServiceContext) *SendChat
 // SendChat 快速发送消息
 func (l *SendChatLogic) SendChat(in *bench.SendChatRequest) (*bench.SendChatResponse, error) {
 
-	var (
-		plans []*planmanager.Plan
-	)
+	err := l.svcCtx.PlanManager.GroupDo(in.Uuid, func(plan *planmanager.Plan) error {
+		return plan.PlanSendChat(l.ctx, in.Message, in.Number, in.Limit, in.Duration)
+	})
 
-	if in.Uuid != nil { // 说明单发
-
-		p, err := l.svcCtx.PlanManager.GetPlan(in.GetUuid())
-		if err != nil {
-			return nil, err
-		}
-
-		plans = []*planmanager.Plan{p}
-
-	} else {
-		plans = l.svcCtx.PlanManager.GetAllPlan()
-	}
-
-	for _, p := range plans {
-		err := p.PlanSendChat(l.ctx, in.Message, in.Number, in.Limit, in.Duration)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &bench.SendChatResponse{}, nil
+	return &bench.SendChatResponse{}, err
 }

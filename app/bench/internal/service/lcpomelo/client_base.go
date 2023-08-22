@@ -13,7 +13,7 @@ import (
 )
 
 // runAndWaitConnect Connector 初始化握手信息和保持连接
-func (c *ClientConnector) runAndWaitConnect(ctx context.Context, connector *pomelosdk.Connector, address string, failed func(message string)) error {
+func (c *ClientConnector) runAndWaitConnect(ctx context.Context, connector *pomelosdk.Connector, address string, timeout time.Duration, failed func(message string)) error {
 	err := connector.InitReqHandshake("0.6.0", "golang-websocket", nil, map[string]interface{}{"uid": "dude"})
 	if err != nil {
 		return err
@@ -33,7 +33,11 @@ func (c *ClientConnector) runAndWaitConnect(ctx context.Context, connector *pome
 
 	go func() {
 
-		err = connector.Run(address, 10)
+		// 增加超时时间
+		ctx2, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		err = connector.Run(ctx2, address, 10)
 		if err != nil {
 
 			logx.WithContext(ctx).Errorf("[%d] pomelo Connector.Run failed ,err:%s", c.uid, err)
@@ -45,7 +49,7 @@ func (c *ClientConnector) runAndWaitConnect(ctx context.Context, connector *pome
 		}
 	}()
 
-	_, ok := cond.WaitWithTimeout(10 * time.Second)
+	_, ok := cond.WaitWithTimeout(timeout + 5*time.Second)
 	if !ok {
 		return errors.New("run timeout")
 	}

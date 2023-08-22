@@ -13,28 +13,30 @@ import (
 )
 
 type (
-	ClosePlanRequest   = bench.ClosePlanRequest
-	ClosePlanResponse  = bench.ClosePlanResponse
-	Connector          = bench.Connector
-	ConnectorLog       = bench.ConnectorLog
-	ConnectorStatus    = bench.ConnectorStatus
-	CustomMessagePool  = bench.CustomMessagePool
-	CustomSendRequest  = bench.CustomSendRequest
-	CustomSendResponse = bench.CustomSendResponse
-	DetailPlanRequest  = bench.DetailPlanRequest
-	DetailPlanResponse = bench.DetailPlanResponse
-	ListPlanRequest    = bench.ListPlanRequest
-	ListPlanResponse   = bench.ListPlanResponse
-	Metrics            = bench.Metrics
-	Plan               = bench.Plan
-	PlanDetail         = bench.PlanDetail
-	PlanMonitor        = bench.PlanMonitor
-	PomeloConnector    = bench.PomeloConnector
-	SendChatRequest    = bench.SendChatRequest
-	SendChatResponse   = bench.SendChatResponse
-	StartPlanRequest   = bench.StartPlanRequest
-	StartPlanResponse  = bench.StartPlanResponse
-	Statistics         = bench.Statistics
+	ClearStatisticsRequest  = bench.ClearStatisticsRequest
+	ClearStatisticsResponse = bench.ClearStatisticsResponse
+	ClosePlanRequest        = bench.ClosePlanRequest
+	ClosePlanResponse       = bench.ClosePlanResponse
+	Connector               = bench.Connector
+	ConnectorLog            = bench.ConnectorLog
+	ConnectorStatus         = bench.ConnectorStatus
+	CustomMessagePool       = bench.CustomMessagePool
+	CustomSendRequest       = bench.CustomSendRequest
+	CustomSendResponse      = bench.CustomSendResponse
+	DetailPlanRequest       = bench.DetailPlanRequest
+	DetailPlanResponse      = bench.DetailPlanResponse
+	ListPlanRequest         = bench.ListPlanRequest
+	ListPlanResponse        = bench.ListPlanResponse
+	Metrics                 = bench.Metrics
+	Plan                    = bench.Plan
+	PlanDetail              = bench.PlanDetail
+	PlanMonitor             = bench.PlanMonitor
+	PomeloConnector         = bench.PomeloConnector
+	SendChatRequest         = bench.SendChatRequest
+	SendChatResponse        = bench.SendChatResponse
+	StartPlanRequest        = bench.StartPlanRequest
+	StartPlanResponse       = bench.StartPlanResponse
+	Statistics              = bench.Statistics
 
 	Bench interface {
 		// StartPlan 启动压测
@@ -43,6 +45,8 @@ type (
 		SendChat(ctx context.Context, in *SendChatRequest, opts ...grpc.CallOption) (*SendChatResponse, error)
 		// CustomSend 自定义消息发送
 		CustomSend(ctx context.Context, in *CustomSendRequest, opts ...grpc.CallOption) (*CustomSendResponse, error)
+		// ClearStatistics 清理任务指标
+		ClearStatistics(ctx context.Context, in *ClearStatisticsRequest, opts ...grpc.CallOption) (*ClearStatisticsResponse, error)
 		// ClosePlan 清理任务
 		ClosePlan(ctx context.Context, in *ClosePlanRequest, opts ...grpc.CallOption) (*ClosePlanResponse, error)
 		// ListPlan 查询压测计划
@@ -78,6 +82,12 @@ func (m *defaultBench) SendChat(ctx context.Context, in *SendChatRequest, opts .
 func (m *defaultBench) CustomSend(ctx context.Context, in *CustomSendRequest, opts ...grpc.CallOption) (*CustomSendResponse, error) {
 	client := bench.NewBenchClient(m.cli.Conn())
 	return client.CustomSend(ctx, in, opts...)
+}
+
+// ClearStatistics 清理任务指标
+func (m *defaultBench) ClearStatistics(ctx context.Context, in *ClearStatisticsRequest, opts ...grpc.CallOption) (*ClearStatisticsResponse, error) {
+	client := bench.NewBenchClient(m.cli.Conn())
+	return client.ClearStatistics(ctx, in, opts...)
 }
 
 // ClosePlan 清理任务

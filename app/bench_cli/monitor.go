@@ -32,6 +32,7 @@ func monitorTree() {
 				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: fmt.Sprintf("send: %d", res.Plans[i].Total.SendCount)})
 				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: fmt.Sprintf("custom send: %d", res.Plans[i].Total.CustomSendCount)})
 
+				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: fmt.Sprintf("gate connector : %d", res.Plans[i].Connector.GateConnector)})
 				if res.Plans[i].Connector.ChatConnector != res.Plans[i].Plan.RoomNumber*res.Plans[i].Plan.RoomSize {
 					leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: fmt.Sprintf("[WARNING] online: %d. should be %d", res.Plans[i].Connector.ChatConnector,
 						res.Plans[i].Plan.RoomNumber*res.Plans[i].Plan.RoomSize)})
