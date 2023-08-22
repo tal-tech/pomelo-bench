@@ -48,3 +48,16 @@ Please select an option [type to search]:
   tree
   quit
 ```
+
+### Docker部署pomelo bench
+
+```shell
+# 构建程序
+make build_linux
+
+# 构建镜像
+make docker_build
+
+# 运行docker镜像
+make docker_run
+```
