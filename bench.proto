@@ -12,6 +12,8 @@ service Bench {
   rpc SendChat(SendChatRequest) returns (SendChatResponse) {}
   // CustomSend 自定义消息发送
   rpc CustomSend(CustomSendRequest) returns (CustomSendResponse) {}
+  // ClearStatistics 清理任务指标
+  rpc ClearStatistics(ClearStatisticsRequest) returns (ClearStatisticsResponse) {}
   // ClosePlan 清理任务
   rpc ClosePlan(ClosePlanRequest) returns (ClosePlanResponse) {}
 
@@ -70,6 +72,9 @@ message Plan {
   string address = 5;
   // channel id
   uint64 channel_id = 6;
+
+  // connector 连接超时时间
+  uint64 timeout = 7;
 }
 
 // Connector 客户端链接情况
@@ -177,6 +182,13 @@ message ClosePlanRequest {
 
 message ClosePlanResponse {}
 
+// ClearStatistics 清理任务指标
+message ClearStatisticsRequest {
+  // 计划uid 选填没有代表全部
+  optional string uuid = 1;
+}
+
+message ClearStatisticsResponse {}
 
 // ListPlan 查询压测计划
 message ListPlanRequest {}

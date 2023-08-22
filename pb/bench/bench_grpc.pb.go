@@ -28,6 +28,8 @@ type BenchClient interface {
 	SendChat(ctx context.Context, in *SendChatRequest, opts ...grpc.CallOption) (*SendChatResponse, error)
 	// CustomSend 自定义消息发送
 	CustomSend(ctx context.Context, in *CustomSendRequest, opts ...grpc.CallOption) (*CustomSendResponse, error)
+	// ClearStatistics 清理任务指标
+	ClearStatistics(ctx context.Context, in *ClearStatisticsRequest, opts ...grpc.CallOption) (*ClearStatisticsResponse, error)
 	// ClosePlan 清理任务
 	ClosePlan(ctx context.Context, in *ClosePlanRequest, opts ...grpc.CallOption) (*ClosePlanResponse, error)
 	// ListPlan 查询压测计划
@@ -71,6 +73,15 @@ func (c *benchClient) CustomSend(ctx context.Context, in *CustomSendRequest, opt
 	return out, nil
 }
 
+func (c *benchClient) ClearStatistics(ctx context.Context, in *ClearStatisticsRequest, opts ...grpc.CallOption) (*ClearStatisticsResponse, error) {
+	out := new(ClearStatisticsResponse)
+	err := c.cc.Invoke(ctx, "/bench.Bench/ClearStatistics", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *benchClient) ClosePlan(ctx context.Context, in *ClosePlanRequest, opts ...grpc.CallOption) (*ClosePlanResponse, error) {
 	out := new(ClosePlanResponse)
 	err := c.cc.Invoke(ctx, "/bench.Bench/ClosePlan", in, out, opts...)
@@ -108,6 +119,8 @@ type BenchServer interface {
 	SendChat(context.Context, *SendChatRequest) (*SendChatResponse, error)
 	// CustomSend 自定义消息发送
 	CustomSend(context.Context, *CustomSendRequest) (*CustomSendResponse, error)
+	// ClearStatistics 清理任务指标
+	ClearStatistics(context.Context, *ClearStatisticsRequest) (*ClearStatisticsResponse, error)
 	// ClosePlan 清理任务
 	ClosePlan(context.Context, *ClosePlanRequest) (*ClosePlanResponse, error)
 	// ListPlan 查询压测计划
@@ -129,6 +142,9 @@ func (UnimplementedBenchServer) SendChat(context.Context, *SendChatRequest) (*Se
 }
 func (UnimplementedBenchServer) CustomSend(context.Context, *CustomSendRequest) (*CustomSendResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CustomSend not implemented")
+}
+func (UnimplementedBenchServer) ClearStatistics(context.Context, *ClearStatisticsRequest) (*ClearStatisticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearStatistics not implemented")
 }
 func (UnimplementedBenchServer) ClosePlan(context.Context, *ClosePlanRequest) (*ClosePlanResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClosePlan not implemented")
@@ -206,6 +222,24 @@ func _Bench_CustomSend_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Bench_ClearStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClearStatisticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BenchServer).ClearStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bench.Bench/ClearStatistics",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BenchServer).ClearStatistics(ctx, req.(*ClearStatisticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Bench_ClosePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClosePlanRequest)
 	if err := dec(in); err != nil {
@@ -278,6 +312,10 @@ var Bench_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CustomSend",
 			Handler:    _Bench_CustomSend_Handler,
+		},
+		{
+			MethodName: "ClearStatistics",
+			Handler:    _Bench_ClearStatistics_Handler,
 		},
 		{
 			MethodName: "ClosePlan",

@@ -3,6 +3,8 @@ package planmanager
 import (
 	"context"
 	"fmt"
+	"github.com/panjf2000/ants/v2"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/timex"
 	"pomelo_bench/app/bench/internal/metrics"
 	lcpomelo2 "pomelo_bench/app/bench/internal/service/lcpomelo"
@@ -11,45 +13,60 @@ import (
 	"time"
 )
 
+const DefaultConcurrency = 100
+
 type Plan struct {
-	uid             string
-	cfg             *bench.Plan
-	status          bench.Status
-	lcPomeloClients []*lcpomelo2.ClientConnector
-	metrics         *metrics.Metrics
+	uid         string
+	cfg         *bench.Plan
+	status      bench.Status
+	rooms       []room
+	clientCount int
+	metrics     *metrics.Metrics
+}
+
+type room struct {
+	roomId  string
+	clients []*lcpomelo2.ClientConnector
 }
 
 func NewPlan(uid string, cfg *bench.Plan) *Plan {
 
 	p := &Plan{
-		uid:             uid,
-		cfg:             cfg,
-		status:          bench.Status_Waiting,
-		lcPomeloClients: make([]*lcpomelo2.ClientConnector, 0, cfg.RoomNumber*cfg.RoomSize),
-		metrics:         metrics.NewMetrics("plan"),
+		uid:         uid,
+		cfg:         cfg,
+		status:      bench.Status_Waiting,
+		rooms:       make([]room, 0, cfg.RoomNumber),
+		clientCount: int(cfg.RoomSize * cfg.RoomNumber),
+		metrics:     metrics.NewMetrics("plan"),
 	}
 
 	for i := 0; i < int(cfg.RoomNumber); i++ {
-		var roomId = fmt.Sprintf("%s_%d", cfg.RoomIdPre, i) // room id
+		r := room{
+			roomId:  fmt.Sprintf("%s_%d", cfg.RoomIdPre, i), // room id
+			clients: make([]*lcpomelo2.ClientConnector, 0, cfg.RoomSize),
+		}
 
 		for j := 0; j < int(cfg.RoomSize); j++ {
 
 			var uid = int(cfg.BaseUid) + i*int(cfg.RoomSize) + j // 学员id
 
-			c := lcpomelo2.NewClientConnector(cfg.Address, uid, int(cfg.ChannelId), roomId)
+			c := lcpomelo2.NewClientConnector(cfg.Address, uid, int(cfg.ChannelId), r.roomId)
 
-			p.lcPomeloClients = append(p.lcPomeloClients, c)
+			r.clients = append(r.clients, c)
 		}
+
+		p.rooms = append(p.rooms, r)
 	}
 
 	return p
 }
 
-func (p *Plan) PlanQueryGate(ctx context.Context) error {
+func (p *Plan) PlanQueryGateAndEnter(ctx context.Context, timeout time.Duration) error {
 
-	err := p.asyncDo(func(connector *lcpomelo2.ClientConnector) error {
+	// 限制下并发量 20
+	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
 
-		err := connector.RunGateConnectorAndWaitConnect(ctx)
+		err := connector.RunGateConnectorAndWaitConnect(ctx, timeout)
 		if err != nil {
 
 			p.status = bench.Status_Failed
@@ -58,6 +75,28 @@ func (p *Plan) PlanQueryGate(ctx context.Context) error {
 		}
 
 		err = connector.SyncGateRequest(ctx)
+		if err != nil {
+
+			p.status = bench.Status_Failed
+
+			return err
+		}
+
+		// 关闭gate失败 不认为失败
+		err = connector.CloseGate(ctx)
+		if err != nil {
+			logx.Error("connector.CloseGate(ctx) failed,err:", err)
+		}
+
+		err = connector.RunChatConnectorAndWaitConnect(ctx, timeout)
+		if err != nil {
+
+			p.status = bench.Status_Failed
+
+			return err
+		}
+
+		err = connector.SyncChatEnterConnectorRequest(ctx)
 		if err != nil {
 
 			p.status = bench.Status_Failed
@@ -77,38 +116,12 @@ func (p *Plan) PlanQueryGate(ctx context.Context) error {
 	return nil
 }
 
-func (p *Plan) PlanConnectEntry(ctx context.Context) error {
-
-	err := p.asyncDo(func(connector *lcpomelo2.ClientConnector) error {
-
-		err := connector.RunChatConnectorAndWaitConnect(ctx)
-		if err != nil {
-
-			p.status = bench.Status_Failed
-
-			return err
-		}
-
-		err = connector.SyncChatEnterConnectorRequest(ctx)
-		if err != nil {
-
-			p.status = bench.Status_Failed
-
-			return err
-		}
-
-		return nil
-	})
-
-	return err
-}
-
 func (p *Plan) PlanSendChat(ctx context.Context, message string, number uint64, limit uint64, duration uint64) (err error) {
 	if number == 0 {
 		return nil
 	}
 
-	err = p.asyncDo2(int(limit), func(index int, length int, connector *lcpomelo2.ClientConnector) error {
+	err = p.asyncDo(int(limit), 0, func(index int64, length int, connector *lcpomelo2.ClientConnector) error {
 
 		for j := 0; j < int(number); j++ {
 
@@ -138,11 +151,11 @@ func (p *Plan) PlanCustomSend(ctx context.Context, pool *bench.CustomMessagePool
 		return nil
 	}
 
-	err = p.asyncDo2(int(limit), func(index int, length int, connector *lcpomelo2.ClientConnector) error {
+	err = p.asyncDo(int(limit), 0, func(index int64, length int, connector *lcpomelo2.ClientConnector) error {
 
 		for i := 0; i < int(number); i++ {
 
-			for j := index; j < len(pool.Data); j += length { // 只取自己的那条子集
+			for j := int(index); j < len(pool.Data); j += length { // 只取自己的那条子集
 
 				startTime := timex.Now()
 				err := connector.AsyncCustomSend(ctx, pool.Router, pool.Data[j], func(data []byte) {
@@ -170,23 +183,36 @@ func (p *Plan) PlanDetail(ctx context.Context) PlanDetail {
 
 	res := PlanDetail{
 		Cfg:        p.cfg,
-		Connectors: make([]lcpomelo2.ClientDetail, 0, len(p.lcPomeloClients)),
+		Connectors: make([]lcpomelo2.ClientDetail, 0, p.clientCount),
 		Status:     p.status,
 		Stat:       p.metrics.Execute(),
 	}
 
-	for i := 0; i < len(p.lcPomeloClients); i++ {
-		detail := p.lcPomeloClients[i].Detail(ctx)
+	for i := 0; i < len(p.rooms); i++ {
 
-		res.Connectors = append(res.Connectors, detail)
+		for j := 0; j < len(p.rooms[i].clients); j++ {
+			detail := p.rooms[i].clients[j].Detail(ctx)
+
+			res.Connectors = append(res.Connectors, detail)
+		}
 	}
 
 	return res
 }
 
+func (p *Plan) CloseGate(ctx context.Context) error {
+
+	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
+
+		return connector.CloseGate(ctx)
+	})
+
+	return err
+}
+
 func (p *Plan) Close(ctx context.Context) error {
 
-	err := p.asyncDo(func(connector *lcpomelo2.ClientConnector) error {
+	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
 		err := connector.CloseGate(ctx)
 		if err != nil {
 			return err
@@ -203,55 +229,46 @@ func (p *Plan) Close(ctx context.Context) error {
 	return err
 }
 
-// 异步动作
-func (p *Plan) asyncDo(do func(*lcpomelo2.ClientConnector) error) (err error) {
-
-	wg := sync.WaitGroup{}
-
-	for i := 0; i < len(p.lcPomeloClients); i++ {
-
-		wg.Add(1)
-
-		go func(index int) {
-
-			oErr := do(p.lcPomeloClients[index])
-			if oErr != nil {
-				err = oErr
-			}
-
-			wg.Done()
-
-		}(i)
-	}
-
-	wg.Wait()
-
-	return err
+func (p *Plan) ClearMetrics(ctx context.Context) {
+	p.metrics.Clear()
 }
 
-// 异步动作2
-func (p *Plan) asyncDo2(limit int, do func(index int, length int, connector *lcpomelo2.ClientConnector) error) (err error) {
-	l := len(p.lcPomeloClients)
-	if limit != 0 && l > limit {
-		l = limit
+// 异步动作2 limit 限制房间发送人数 concurrency 并发量
+func (p *Plan) asyncDo(roomLimit int, concurrency int, do func(index int64, length int, connector *lcpomelo2.ClientConnector) error) (err error) {
+	l := p.clientCount
+	limitLen := roomLimit * int(p.cfg.RoomNumber)
+	if limitLen != 0 && l > limitLen {
+		l = limitLen
+	}
+
+	// 并发量最大等于 发送学员数
+	size := l
+	if concurrency != 0 && size > concurrency {
+		size = concurrency
 	}
 
 	wg := sync.WaitGroup{}
+
+	pool, _ := ants.NewPoolWithFunc(size, func(i interface{}) {
+		ii := i.(int64)
+		roomIndex := int(ii) % int(p.cfg.RoomNumber)
+		clientIndex := int(ii) / int(p.cfg.RoomNumber)
+
+		oErr := do(ii, l, p.rooms[roomIndex].clients[clientIndex])
+		if oErr != nil {
+			err = oErr
+		}
+
+		wg.Done()
+	})
+	defer pool.Release()
 
 	for i := 0; i < l; i++ {
 
 		wg.Add(1)
 
-		go func(index int) {
-
-			oErr := do(index, l, p.lcPomeloClients[index])
-			if oErr != nil {
-				err = oErr
-			}
-
-			wg.Done()
-
-		}(i)
+		// Submit tasks one by one.
+		_ = pool.Invoke(int64(i))
 	}
 
 	wg.Wait()

@@ -1,6 +1,7 @@
 package pomelosdk
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -38,6 +39,8 @@ type (
 		// response handler
 		muResponses sync.RWMutex
 		responses   map[uint]Callback
+
+		heartbeat int //  = 13
 	}
 	// DefaultACK --
 	DefaultHandshakePacket struct {
@@ -162,7 +165,7 @@ func (c *Connector) InitHandshakeACK(heartbeatDuration int) error {
 }
 
 // Run --
-func (c *Connector) Run(addr string, tickrate int64) error {
+func (c *Connector) Run(ctx context.Context, addr string, tickrate int64) error {
 	if c.handshakeData == nil {
 		return errors.New("handshake not defined")
 	}
@@ -181,10 +184,14 @@ func (c *Connector) Run(addr string, tickrate int64) error {
 		}
 	}
 
+	if c.heartbeat == 0 {
+		c.heartbeat = 13
+	}
+
 	if strings.HasPrefix(addr, "ws://") || strings.HasPrefix(addr, "wss://") {
 
 		//conn, err = websocket.Dial(addr, "", "http://localhost/")
-		socketConn, _, err := websocket.DefaultDialer.Dial(addr, nil)
+		socketConn, _, err := websocket.DefaultDialer.DialContext(ctx, addr, nil)
 		if err != nil {
 			return err
 		}
@@ -309,6 +316,9 @@ func (c *Connector) sendMessage(msg *message.Message) error {
 }
 
 func (c *Connector) write() {
+
+	var heartbeat = time.After(time.Duration(c.heartbeat) * time.Second)
+
 	for {
 		select {
 		case data := <-c.chSend:
@@ -320,6 +330,13 @@ func (c *Connector) write() {
 					//log.Println("conn write success,n: ", n, ", data:", string(data))
 				}
 			}
+
+		case <-heartbeat:
+			_ = c.conn.WriteMessage(websocket.BinaryMessage, c.heartbeatData)
+
+			heartbeat = time.After(time.Duration(c.heartbeat) * time.Second)
+
+			//log.Println("send heartbeat")
 
 		case <-c.die:
 			return
@@ -371,21 +388,6 @@ func (c *Connector) read(tickrate int64) error {
 	}
 }
 
-func (c *Connector) heartbeat(heartbeat int) {
-	if heartbeat == 0 {
-		heartbeat = 13
-	}
-
-	ticker := time.NewTicker(time.Second * time.Duration(heartbeat))
-	for range ticker.C {
-		if c.IsClosed() {
-			return
-		}
-		c.send(c.heartbeatData)
-		//log.Println("send heartbeat")
-	}
-}
-
 func (c *Connector) processPacket(p *packet.Packet) {
 	// log.Printf("packet: %+v\n", p)
 	switch p.Type {
@@ -397,9 +399,11 @@ func (c *Connector) processPacket(p *packet.Packet) {
 			return
 		}
 		if handshakeResp.Code == 200 {
-			go func() {
-				c.heartbeat(handshakeResp.Sys.Heartbeat)
-			}()
+
+			if handshakeResp.Sys.Heartbeat != 0 {
+				c.heartbeat = handshakeResp.Sys.Heartbeat
+			}
+
 			c.send(c.handshakeAckData)
 			if c.connectedCallback != nil {
 				c.connectedCallback()

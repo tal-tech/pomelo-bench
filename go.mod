@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/panjf2000/ants/v2 v2.8.1
 	github.com/pterm/pterm v0.12.62
 	github.com/zeromicro/go-zero v1.5.3
 	google.golang.org/grpc v1.55.0

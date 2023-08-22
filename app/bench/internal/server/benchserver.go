@@ -40,6 +40,12 @@ func (s *BenchServer) CustomSend(ctx context.Context, in *bench.CustomSendReques
 	return l.CustomSend(in)
 }
 
+// ClearStatistics 清理任务指标
+func (s *BenchServer) ClearStatistics(ctx context.Context, in *bench.ClearStatisticsRequest) (*bench.ClearStatisticsResponse, error) {
+	l := logic.NewClearStatisticsLogic(ctx, s.svcCtx)
+	return l.ClearStatistics(in)
+}
+
 // ClosePlan 清理任务
 func (s *BenchServer) ClosePlan(ctx context.Context, in *bench.ClosePlanRequest) (*bench.ClosePlanResponse, error) {
 	l := logic.NewClosePlanLogic(ctx, s.svcCtx)

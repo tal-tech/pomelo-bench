@@ -99,6 +99,46 @@ func (m *Manager) GetAllPlan() []*Plan {
 	return res
 }
 
+// GroupDo 并发执行计划
+func (m *Manager) GroupDo(uuid *string, do func(plan *Plan) error) (err error) {
+	if uuid != nil {
+
+		p, ok := m.plans[*uuid]
+		if !ok {
+			return errors.New("invalid uuid")
+		}
+
+		return do(p)
+	}
+
+	res := make([]*Plan, 0, len(m.plans))
+	for _, plan := range m.plans {
+		res = append(res, plan)
+	}
+
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < len(res); i++ {
+
+		wg.Add(1)
+
+		go func(index int) {
+
+			oErr := do(res[index])
+			if oErr != nil {
+				err = oErr
+			}
+
+			wg.Done()
+
+		}(i)
+	}
+
+	wg.Wait()
+
+	return err
+}
+
 func (m *Manager) ClosePlan(p *Plan) error {
 
 	err := p.Close(context.Background())
