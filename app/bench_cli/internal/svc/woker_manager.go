@@ -3,7 +3,6 @@ package svc
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/panjf2000/ants/v2"
 	"pomelo_bench/app/bench/benchclient"
 	"pomelo_bench/app/bench_cli/internal/config"
@@ -35,18 +34,10 @@ func (m *WorkManager) Add(w Woker) {
 	m.wokers = append(m.wokers, w)
 }
 
-func (m *WorkManager) Connect(roomNumber int, roomSize int, channel int, callback func(string, *benchclient.StartPlanResponse, error)) (uid string) {
-
-	uid = uuid.NewString()
-
-	var (
-		oneRoomNumber        = uint64(roomNumber / len(m.wokers))
-		firstRoomLeaveNumber = roomNumber % len(m.wokers) // 未整除剩余的
-		unix                 = time.Now().Unix()          // 放点时间戳 防止重复
-	)
+func (m *WorkManager) Connect(roomNumber int, roomSize int, channel int, callback func(string, *benchclient.StartPlanResponse, error)) {
 
 	// 组建房间请求数据
-	requests := m.analysisStartPlanRequest(roomSize, channel, oneRoomNumber, firstRoomLeaveNumber, unix)
+	requests := m.analysisStartPlanRequest(roomSize, channel, roomNumber)
 
 	wg := sync.WaitGroup{}
 
@@ -76,7 +67,6 @@ func (m *WorkManager) Connect(roomNumber int, roomSize int, channel int, callbac
 
 	wg.Wait()
 
-	return uid
 }
 
 func (m *WorkManager) Each(fu func(woker Woker)) {
@@ -108,10 +98,22 @@ func (m *WorkManager) EachAsync(fu func(woker Woker)) {
 }
 
 // 组建链接请求
-func (m *WorkManager) analysisStartPlanRequest(roomSize int, channel int, oneRoomNumber uint64, firstRoomLeaveNumber int, unix int64) (res []*benchclient.StartPlanRequest) {
+func (m *WorkManager) analysisStartPlanRequest(roomSize int, channel int, roomNumber int) (res []*benchclient.StartPlanRequest) {
+
+	var (
+		oneRoomNumber        = uint64(roomNumber / len(m.wokers))
+		firstRoomLeaveNumber = roomNumber % len(m.wokers) // 未整除剩余的
+		unix                 = time.Now().Unix()          // 放点时间戳 防止重复
+	)
+
 	for i := 0; i < len(m.wokers); i++ {
 
-		number := oneRoomNumber
+		var (
+			number    = oneRoomNumber
+			roomIdPre = fmt.Sprintf("bench_%d_%d", m.baseRoomId, unix)
+			roomIds   []string
+		)
+
 		if i < firstRoomLeaveNumber { // 剩余的部分多分配一个任务
 			number++
 		}
@@ -120,11 +122,17 @@ func (m *WorkManager) analysisStartPlanRequest(roomSize int, channel int, oneRoo
 			continue
 		}
 
+		// roomid 够用
+		if int(m.baseRoomId+number) <= len(m.cfg.RoomIds) {
+			roomIds = m.cfg.RoomIds[m.baseRoomId : m.baseRoomId+number]
+		}
+
 		res = append(res, &benchclient.StartPlanRequest{
 			Plan: &benchclient.Plan{
 				BaseUid:    m.baseUid,
 				RoomNumber: number,
-				RoomIdPre:  fmt.Sprintf("bench_%d_%d", m.baseRoomId, unix),
+				RoomIdPre:  &roomIdPre,
+				RoomIds:    roomIds,
 				RoomSize:   uint64(roomSize),
 				Address:    m.cfg.PomeloAddress,
 				ChannelId:  uint64(channel),
@@ -133,8 +141,14 @@ func (m *WorkManager) analysisStartPlanRequest(roomSize int, channel int, oneRoo
 		})
 
 		m.baseUid += number * uint64(roomSize)
-		m.baseRoomId++
+		m.baseRoomId += number
 	}
 
 	return res
+}
+
+// 清理学生id和roomid
+func (m *WorkManager) Clear() {
+	m.baseUid = 10000
+	m.baseRoomId = 0
 }

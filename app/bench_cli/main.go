@@ -17,6 +17,10 @@ var (
 	exit       = false
 )
 
+const (
+	version = "1.8"
+)
+
 var configFile = flag.String("f", "etc/config.yaml", "the config file")
 
 func main() {
@@ -33,14 +37,14 @@ func main() {
 		panic(err)
 	}
 
+	pterm.DefaultSection.Println(fmt.Sprintf("bench_cli version %s", version))
+	pterm.DefaultSection.Println(fmt.Sprintf("bench_cli Timeout %d", c.Timeout))
+	pterm.DefaultSection.Println(fmt.Sprintf("Address %s", c.PomeloAddress))
+
 	serviceCtx = svc.NewServiceContext(c)
 
 	// 连接上woker机器
 	connectWorker(c.WorksAddr)
-
-	pterm.DefaultSection.Println("bench_cli version 1.3")
-	pterm.DefaultSection.Println(fmt.Sprintf("bench_cli Timeout %d", c.Timeout))
-	pterm.DefaultSection.Println(fmt.Sprintf("Address %s", c.PomeloAddress))
 
 	for !exit {
 
@@ -99,7 +103,6 @@ func menu() {
 }
 
 func connectWorker(worksAddr []string) {
-	pterm.DefaultSection.Println("pomelo bench cli!")
 	pterm.Info.Println("尝试连接压测woker机器")
 
 	for i := 0; i < len(worksAddr); i++ {

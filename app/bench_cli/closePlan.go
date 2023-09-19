@@ -33,5 +33,8 @@ func closePlan() {
 		}
 	})
 
+	// 清理学生id和roomid
+	serviceCtx.Manager.Clear()
+
 	spinner.Success("all close over!")
 }

@@ -7,6 +7,9 @@ import (
 	"github.com/pterm/pterm/putils"
 	"pomelo_bench/app/bench/benchclient"
 	"pomelo_bench/app/bench_cli/internal/svc"
+	"pomelo_bench/pb/bench"
+	"strings"
+	"time"
 )
 
 func monitorTree() {
@@ -46,11 +49,9 @@ func monitorTree() {
 					leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: "[OK] on event"})
 				}
 
-				leveledList = append(leveledList, pterm.LeveledListItem{Level: 3, Text: fmt.Sprintf("detail: on chat: %d | on server: %d | on add: %d | on leave: %d",
-					res.Plans[i].Total.OnChatReceiveCount, res.Plans[i].Total.OnServerReceiveCount, res.Plans[i].Total.OnAddReceiveCount, res.Plans[i].Total.OnLeaveReceiveCount)})
+				leveledList = append(leveledList, pterm.LeveledListItem{Level: 3, Text: totalString(res.Plans[i].Total, res.Plans[i].Plan.RoomNumber*res.Plans[i].Plan.RoomSize)})
 
-				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: fmt.Sprintf("address: %s | room number: %d | room id pre: %s | room size: %d | channel id: %d",
-					res.Plans[i].Plan.Address, res.Plans[i].Plan.RoomNumber, res.Plans[i].Plan.RoomIdPre, res.Plans[i].Plan.RoomSize, res.Plans[i].Plan.ChannelId)})
+				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: planString(res.Plans[i].Plan)})
 
 				// bench 指标统计
 				leveledList = append(leveledList, pterm.LeveledListItem{Level: 2, Text: statString(res.Plans[i].Stat)})
@@ -67,6 +68,48 @@ func monitorTree() {
 	_ = pterm.DefaultTree.WithRoot(root).Render()
 }
 
+func totalString(total *bench.Statistics, totalStudentNumber uint64) string {
+
+	if totalStudentNumber != 0 {
+
+		duration := total.OnChatDuration / int64(totalStudentNumber)
+
+		d := time.Duration(duration)
+
+		return fmt.Sprintf("detail: on chat: %d (duration %s) | on server: %d | on add: %d | on leave: %d",
+			total.OnChatReceiveCount, d.String(), total.OnServerReceiveCount, total.OnAddReceiveCount, total.OnLeaveReceiveCount)
+
+	} else {
+		return fmt.Sprintf("detail: on chat: %d (duration null) | on server: %d | on add: %d | on leave: %d",
+			total.OnChatReceiveCount, total.OnServerReceiveCount, total.OnAddReceiveCount, total.OnLeaveReceiveCount)
+	}
+
+}
+
+func planString(plan *bench.Plan) string {
+
+	if len(plan.RoomIds) == int(plan.RoomNumber) {
+
+		return fmt.Sprintf("address: %s | room number: %d | room size: %d | channel id: %d | room ids: %s",
+			plan.Address,
+			plan.RoomNumber,
+			plan.RoomSize,
+			plan.ChannelId,
+			strings.Join(plan.RoomIds, ","))
+
+	} else {
+
+		return fmt.Sprintf("address: %s | room number: %d |  room size: %d | channel id: %d | room id pre: %s",
+			plan.Address,
+			plan.RoomNumber,
+			plan.RoomSize,
+			plan.ChannelId,
+			pString(plan.RoomIdPre),
+		)
+	}
+
+}
+
 func statString(s *benchclient.Metrics) string {
 	return fmt.Sprintf("drops: %d | average: %.2f | median: %.2f | top90th: %.2f | top99th: %.2f | top99p9th: %.2f ",
 		s.Drops,
@@ -76,4 +119,12 @@ func statString(s *benchclient.Metrics) string {
 		s.Top99Th,
 		s.Top99P9Th)
 
+}
+
+func pString(a *string) string {
+	if a == nil {
+		return ""
+	}
+
+	return *a
 }

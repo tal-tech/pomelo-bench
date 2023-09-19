@@ -42,6 +42,7 @@ func Statistics(a lcpomelo.Statistics) *bench.Statistics {
 		OnAddReceiveCount:    a.OnAddReceiveCount,
 		OnLeaveReceiveCount:  a.OnLeaveReceiveCount,
 		OnChatReceiveCount:   a.OnChatReceiveCount,
+		OnChatDuration:       a.OnChatDuration,
 		OnlineNum:            a.OnlineNum,
 	}
 }

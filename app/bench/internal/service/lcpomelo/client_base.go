@@ -40,7 +40,7 @@ func (c *ClientConnector) runAndWaitConnect(ctx context.Context, connector *pome
 		err = connector.Run(ctx2, address, 10)
 		if err != nil {
 
-			logx.WithContext(ctx).Errorf("[%d] pomelo Connector.Run failed ,err:%s", c.uid, err)
+			logx.WithContext(ctx).Infof("[%d] pomelo Connector.Run failed ,err:%s", c.uid, err)
 
 			if failed != nil {
 				failed(err.Error())

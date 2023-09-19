@@ -28,6 +28,10 @@ func NewManager() *Manager {
 func (m *Manager) CreatePlan(cfg *bench.Plan) string {
 	uid := uuid.NewString()
 
+	if len(m.plans) == 0 {
+		uid = "7f0f850e-2933-4f03-87c0-da1768d51zjm"
+	}
+
 	p := NewPlan(uid, cfg)
 
 	m.plans[uid] = p
@@ -49,11 +53,20 @@ func (m *Manager) ListPlan() (infos []PlanInfo) {
 			totalStatistics lcpomelo.Statistics
 			// Connector 客户端链接情况
 			connector bench.ConnectorStatus
+
+			lastOnChat uint64
 		)
 
 		for i := 0; i < len(detail.Connectors); i++ {
 
 			totalStatistics.Add(detail.Connectors[i].Statistics)
+
+			if lastOnChat != detail.Connectors[i].Statistics.OnChatReceiveCount {
+				logx.Errorf("not equal onChat,uid:%d ,lastOnChat:%d , OnChatReceiveCount:%d",
+					detail.Connectors[i].Uid, lastOnChat, detail.Connectors[i].Statistics.OnChatReceiveCount)
+			}
+
+			lastOnChat = detail.Connectors[i].Statistics.OnChatReceiveCount
 
 			if detail.Connectors[i].PomeloGate.ConnectorConnected {
 				connector.GateConnector++
