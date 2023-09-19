@@ -34,7 +34,7 @@ func connect() {
 
 	pterm.Info.Println("正在尝试连接")
 
-	uid := serviceCtx.Manager.Connect(iroom_number, iroom_size, ichannel, func(address string, response *benchclient.StartPlanResponse, err error) {
+	serviceCtx.Manager.Connect(iroom_number, iroom_size, ichannel, func(address string, response *benchclient.StartPlanResponse, err error) {
 
 		if err != nil {
 			pterm.Error.Println(address, "连接失败, err:", err)
@@ -44,5 +44,5 @@ func connect() {
 
 	})
 
-	pterm.Info.Println("任务连接成功, ", uid)
+	pterm.Info.Println("任务连接成功")
 }

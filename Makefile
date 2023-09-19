@@ -20,13 +20,13 @@ kill:
 	pkill bench
 
 docker_build:
-	docker build -t pomelo_bench:v1.3 .
+	docker build -t pomelo_bench:v1.8 .
 
 docker_run:
-	docker run -d --restart=always --name=pomelo_bench -p 8080:8080 -p 9101:9101 pomelo_bench:v1.3
+	docker run -d --restart=always --name=pomelo_bench -p 8080:8080 -p 9101:9101 pomelo_bench:v1.8
 
 docker_save:
-	docker save pomelo_bench:v1.3 -o pomelo_bench_1_3.tar
+	docker save pomelo_bench:v1.8 -o pomelo_bench_1_8.tar
 
 docker_load:
-	docker load -i pomelo_bench_1_3.tar
+	docker load -i pomelo_bench_1_8.tar

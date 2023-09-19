@@ -30,6 +30,7 @@ func (c *ClientConnector) Detail(ctx context.Context) ClientDetail {
 			OnAddReceiveCount:    atomic.LoadUint64(c.onAddReceiveCount),
 			OnLeaveReceiveCount:  atomic.LoadUint64(c.onLeaveReceiveCount),
 			OnChatReceiveCount:   atomic.LoadUint64(c.onChatReceiveCount),
+			OnChatDuration:       int64(c.metrics.Duration()),
 		},
 	}
 }
@@ -58,6 +59,7 @@ type Statistics struct {
 	OnAddReceiveCount    uint64
 	OnLeaveReceiveCount  uint64
 	OnChatReceiveCount   uint64
+	OnChatDuration       int64 // 接收到包的耗时统计
 }
 
 func (s *Statistics) Add(b Statistics) {
@@ -68,6 +70,7 @@ func (s *Statistics) Add(b Statistics) {
 	s.OnAddReceiveCount += b.OnAddReceiveCount
 	s.OnLeaveReceiveCount += b.OnLeaveReceiveCount
 	s.OnChatReceiveCount += b.OnChatReceiveCount
+	s.OnChatDuration += b.OnChatDuration
 }
 
 type ConnectorDetail struct {

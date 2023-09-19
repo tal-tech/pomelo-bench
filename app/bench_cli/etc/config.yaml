@@ -9,3 +9,5 @@ PomeloAddress: "ws://localhost:443"
 # 自定义压测消息内容
 CustomSendFiles:
   - "etc/customsend.txt"
+RoomIds:
+  - "pomelo_bench_room_id_001"

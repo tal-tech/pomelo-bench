@@ -3,9 +3,11 @@ package planmanager
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/panjf2000/ants/v2"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/timex"
+	"math/rand"
 	"pomelo_bench/app/bench/internal/metrics"
 	lcpomelo2 "pomelo_bench/app/bench/internal/service/lcpomelo"
 	"pomelo_bench/pb/bench"
@@ -41,9 +43,18 @@ func NewPlan(uid string, cfg *bench.Plan) *Plan {
 	}
 
 	for i := 0; i < int(cfg.RoomNumber); i++ {
+
 		r := room{
-			roomId:  fmt.Sprintf("%s_%d", cfg.RoomIdPre, i), // room id
+			//roomId:  fmt.Sprintf("%s_%d", uuid.NewString(), i), // room id
 			clients: make([]*lcpomelo2.ClientConnector, 0, cfg.RoomSize),
+		}
+
+		if len(cfg.RoomIds) == int(cfg.RoomNumber) {
+			r.roomId = cfg.RoomIds[i]
+		} else if cfg.RoomIdPre != nil {
+			r.roomId = fmt.Sprintf("%s_%d", *cfg.RoomIdPre, i)
+		} else {
+			r.roomId = fmt.Sprintf("%s_%d", uuid.NewString(), i)
 		}
 
 		for j := 0; j < int(cfg.RoomSize); j++ {
@@ -64,7 +75,7 @@ func NewPlan(uid string, cfg *bench.Plan) *Plan {
 func (p *Plan) PlanQueryGateAndEnter(ctx context.Context, timeout time.Duration) error {
 
 	// 限制下并发量 20
-	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
+	err := p.asyncDo(0, DefaultConcurrency, func(connector *lcpomelo2.ClientConnector) error {
 
 		err := connector.RunGateConnectorAndWaitConnect(ctx, timeout)
 		if err != nil {
@@ -121,12 +132,12 @@ func (p *Plan) PlanSendChat(ctx context.Context, message string, number uint64, 
 		return nil
 	}
 
-	err = p.asyncDo(int(limit), 0, func(index int64, length int, connector *lcpomelo2.ClientConnector) error {
+	err = p.asyncDo(int(limit), 0, func(connector *lcpomelo2.ClientConnector) error {
 
 		for j := 0; j < int(number); j++ {
 
 			startTime := timex.Now()
-			err := connector.AsyncChatSendMessage(ctx, message, func(data []byte) {
+			err := connector.AsyncChatSendMessage(ctx, message, func(_ []byte) {
 				duration := timex.Since(startTime)
 				p.metrics.Add(duration)
 			})
@@ -151,25 +162,30 @@ func (p *Plan) PlanCustomSend(ctx context.Context, pool *bench.CustomMessagePool
 		return nil
 	}
 
-	err = p.asyncDo(int(limit), 0, func(index int64, length int, connector *lcpomelo2.ClientConnector) error {
+	if len(pool.Data) == 0 {
+		return nil
+	}
+
+	err = p.asyncDo(int(limit), 0, func(connector *lcpomelo2.ClientConnector) error {
 
 		for i := 0; i < int(number); i++ {
 
-			for j := int(index); j < len(pool.Data); j += length { // 只取自己的那条子集
+			index := rand.Intn(len(pool.Data))
 
-				startTime := timex.Now()
-				err := connector.AsyncCustomSend(ctx, pool.Router, pool.Data[j], func(data []byte) {
-					duration := timex.Since(startTime)
-					p.metrics.Add(duration)
-				})
-				if err != nil {
-					p.metrics.Drop()
-					return err
-				}
+			data := pool.Data[index]
 
-				if duration > 0 {
-					time.Sleep(time.Duration(duration) * time.Millisecond)
-				}
+			startTime := timex.Now()
+			err := connector.AsyncCustomSend(ctx, pool.Router, data, func(_ []byte) {
+				duration := timex.Since(startTime)
+				p.metrics.Add(duration)
+			})
+			if err != nil {
+				p.metrics.Drop()
+				return err
+			}
+
+			if duration > 0 {
+				time.Sleep(time.Duration(duration) * time.Millisecond)
 			}
 		}
 
@@ -202,7 +218,7 @@ func (p *Plan) PlanDetail(ctx context.Context) PlanDetail {
 
 func (p *Plan) CloseGate(ctx context.Context) error {
 
-	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
+	err := p.asyncDo(0, DefaultConcurrency, func(connector *lcpomelo2.ClientConnector) error {
 
 		return connector.CloseGate(ctx)
 	})
@@ -212,7 +228,7 @@ func (p *Plan) CloseGate(ctx context.Context) error {
 
 func (p *Plan) Close(ctx context.Context) error {
 
-	err := p.asyncDo(0, DefaultConcurrency, func(_ int64, _ int, connector *lcpomelo2.ClientConnector) error {
+	err := p.asyncDo(0, DefaultConcurrency, func(connector *lcpomelo2.ClientConnector) error {
 		err := connector.CloseGate(ctx)
 		if err != nil {
 			return err
@@ -231,10 +247,20 @@ func (p *Plan) Close(ctx context.Context) error {
 
 func (p *Plan) ClearMetrics(ctx context.Context) {
 	p.metrics.Clear()
+
+	for i := 0; i < len(p.rooms); i++ {
+
+		for j := 0; j < len(p.rooms[i].clients); j++ {
+
+			p.rooms[i].clients[j].ClearMetrics()
+
+		}
+	}
+
 }
 
 // 异步动作2 limit 限制房间发送人数 concurrency 并发量
-func (p *Plan) asyncDo(roomLimit int, concurrency int, do func(index int64, length int, connector *lcpomelo2.ClientConnector) error) (err error) {
+func (p *Plan) asyncDo(roomLimit int, concurrency int, do func(connector *lcpomelo2.ClientConnector) error) (err error) {
 	l := p.clientCount
 	limitLen := roomLimit * int(p.cfg.RoomNumber)
 	if limitLen != 0 && l > limitLen {
@@ -254,7 +280,7 @@ func (p *Plan) asyncDo(roomLimit int, concurrency int, do func(index int64, leng
 		roomIndex := int(ii) % int(p.cfg.RoomNumber)
 		clientIndex := int(ii) / int(p.cfg.RoomNumber)
 
-		oErr := do(ii, l, p.rooms[roomIndex].clients[clientIndex])
+		oErr := do(p.rooms[roomIndex].clients[clientIndex])
 		if oErr != nil {
 			err = oErr
 		}

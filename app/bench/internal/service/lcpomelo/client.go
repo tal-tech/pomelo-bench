@@ -9,6 +9,7 @@ import (
 	"github.com/zeromicro/go-zero/core/jsonx"
 	"github.com/zeromicro/go-zero/core/logx"
 	"math/rand"
+	"pomelo_bench/app/bench/internal/metrics"
 	"pomelo_bench/pomelosdk"
 	"strconv"
 	"strings"
@@ -50,11 +51,12 @@ type ClientConnector struct {
 
 	sendCount            *uint64
 	customSendCount      *uint64
-	onServerReceiveCount *uint64 // 接收到包的数量
-	onAddReceiveCount    *uint64 // 接收到包的数量
-	onLeaveReceiveCount  *uint64 // 接收到包的数量
-	onChatReceiveCount   *uint64 // 接收到包的数量
-	onlineNum            uint64  // 房间在线人数
+	onServerReceiveCount *uint64               // 接收到包的数量
+	onAddReceiveCount    *uint64               // 接收到包的数量
+	onLeaveReceiveCount  *uint64               // 接收到包的数量
+	onChatReceiveCount   *uint64               // 接收到包的数量
+	onlineNum            uint64                // 房间在线人数
+	metrics              metrics.SimpleMetrics // 接收到包的耗时统计
 }
 
 func NewClientConnector(addr string, uid int, channelId int, roomId string) *ClientConnector {
@@ -89,11 +91,11 @@ func NewClientConnector(addr string, uid int, channelId int, roomId string) *Cli
 
 		sendCount:            &sendCount,
 		customSendCount:      &customSendCount,
-		onServerReceiveCount: &onServerReceiveCount, // 接收到包的数量
-		onAddReceiveCount:    &onAddReceiveCount,    // 接收到包的数量
-		onLeaveReceiveCount:  &onLeaveReceiveCount,  // 接收到包的数量
-		onChatReceiveCount:   &onChatReceiveCount,   // 接收到包的数量
-
+		onServerReceiveCount: &onServerReceiveCount,   // 接收到包的数量
+		onAddReceiveCount:    &onAddReceiveCount,      // 接收到包的数量
+		onLeaveReceiveCount:  &onLeaveReceiveCount,    // 接收到包的数量
+		onChatReceiveCount:   &onChatReceiveCount,     // 接收到包的数量
+		metrics:              metrics.SimpleMetrics{}, // 接收到包的耗时统计
 	}
 }
 
@@ -145,8 +147,8 @@ func (c *ClientConnector) SyncGateRequest(ctx context.Context) error {
 	type GateRequest struct {
 		Rid       string `json:"rid"` // room id
 		Uid       int    `json:"uid"`
-		RType     int    `json:"rtype"`
-		UType     int    `json:"utype"`
+		RType     int    `json:"rtype"` //频道类型,授课频道=1,辅导频道=2,教师组频道=3,rtc房间频道=4
+		UType     int    `json:"utype"` // utype=0正常,utype=1旁观者
 		RetryTime int64  `json:"retrytime"`
 	}
 
@@ -213,7 +215,7 @@ func (c *ClientConnector) SyncChatEnterConnectorRequest(ctx context.Context) err
 		Username     int    `json:"username"`
 		Rtype        int    `json:"rtype"`
 		Rid          string `json:"rid"`
-		Role         int    `json:"role"`
+		Role         int    `json:"role"` //1:学生，2:辅导，4:授课，3:旁听用户，5:游客
 		Ulevel       int    `json:"ulevel"`
 		Uname        int    `json:"uname"`
 		Classid      string `json:"classid"`
@@ -235,7 +237,7 @@ func (c *ClientConnector) SyncChatEnterConnectorRequest(ctx context.Context) err
 
 		Rtype:        c.channelId,
 		Rid:          c.roomId,
-		Role:         1,
+		Role:         1, //1:学生，2:辅导，4:授课，3:旁听用户，5:游客
 		Ulevel:       1,
 		Classid:      c.roomId,
 		Mtcv:         "0.0.1",
@@ -323,10 +325,59 @@ func (c *ClientConnector) onEvent() {
 	c.pomeloChatConnector.On(Event_OnChat, func(data []byte) {
 		atomic.AddUint64(c.onChatReceiveCount, 1)
 
-		logx.Infof("[%d] onChat,data: %s", c.uid, string(data))
+		duration, err := getOnChatDurationFromContent(data)
+		if err != nil {
+			logx.Infof("[%d] onChat,duration: null ,data: %s", c.uid, string(data))
+		} else {
+
+			c.metrics.Add(duration)
+
+			logx.Infof("[%d] onChat,duration: %s ,  data: %s", c.uid, duration.String(), string(data))
+		}
 
 		ack(data)
 	})
+
+}
+
+func getOnChatDurationFromContent(data []byte) (time.Duration, error) {
+	type onChat struct {
+		//Route  string `json:"route"`
+		Msg string `json:"msg"`
+		//From   string `json:"from"`
+		//Target string `json:"target"`
+		//MsgId  int    `json:"msgId"`
+	}
+
+	type onChatMessage struct {
+		Ctime    string `json:"ctime"`
+		SendTime int    `json:"sendTime"`
+	}
+
+	chat := onChat{}
+	err := json.Unmarshal(data, &chat)
+	if err != nil {
+		return 0, err
+	}
+
+	msg := onChatMessage{}
+
+	err = json.Unmarshal([]byte(chat.Msg), &msg)
+	if err != nil {
+		return 0, err
+	}
+
+	ctime, err := strconv.Atoi(msg.Ctime)
+	if err != nil {
+		return 0, err
+
+	}
+
+	sendTime := time.UnixMilli(int64(ctime))
+
+	duration := time.Since(sendTime)
+
+	return duration, nil
 
 }
 
@@ -386,4 +437,15 @@ func (c *ClientConnector) AsyncChatSendMessage(ctx context.Context, message stri
 	atomic.AddUint64(c.sendCount, 1)
 
 	return nil
+}
+
+func (c *ClientConnector) ClearMetrics() {
+	c.metrics.Clear()
+
+	atomic.SwapUint64(c.sendCount, 0)
+	atomic.SwapUint64(c.customSendCount, 0)
+	atomic.SwapUint64(c.onServerReceiveCount, 0)
+	atomic.SwapUint64(c.onAddReceiveCount, 0)
+	atomic.SwapUint64(c.onLeaveReceiveCount, 0)
+	atomic.SwapUint64(c.onChatReceiveCount, 0)
 }

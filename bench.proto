@@ -43,8 +43,10 @@ message Statistics {
   uint64 on_add_receive_count = 4;
   uint64 on_leave_receive_count = 5;
   uint64 on_chat_receive_count = 6;
+  int64 on_chat_duration = 7;
+
   // 总在线人数
-  uint64 online_num = 7;
+  uint64 online_num = 8;
 }
 
 // 指标统计
@@ -64,17 +66,20 @@ message Plan {
   // 房间连接数
   uint64 room_number = 2;
   // room id 前缀
-  string room_id_pre = 3;
+  optional string room_id_pre = 3;
+  // room id 列表
+  repeated string room_ids = 4;
+
   // room id 前缀
-  uint64 room_size = 4;
+  uint64 room_size = 5;
 
   // 压测地址
-  string address = 5;
+  string address = 6;
   // channel id
-  uint64 channel_id = 6;
+  uint64 channel_id = 7;
 
   // connector 连接超时时间
-  uint64 timeout = 7;
+  uint64 timeout = 8;
 }
 
 // Connector 客户端链接情况
