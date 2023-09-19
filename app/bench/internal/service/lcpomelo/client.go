@@ -147,8 +147,8 @@ func (c *ClientConnector) SyncGateRequest(ctx context.Context) error {
 	type GateRequest struct {
 		Rid       string `json:"rid"` // room id
 		Uid       int    `json:"uid"`
-		RType     int    `json:"rtype"` //频道类型,授课频道=1,辅导频道=2,教师组频道=3,rtc房间频道=4
-		UType     int    `json:"utype"` // utype=0正常,utype=1旁观者
+		RType     int    `json:"rtype"` //
+		UType     int    `json:"utype"` //
 		RetryTime int64  `json:"retrytime"`
 	}
 
@@ -215,7 +215,7 @@ func (c *ClientConnector) SyncChatEnterConnectorRequest(ctx context.Context) err
 		Username     int    `json:"username"`
 		Rtype        int    `json:"rtype"`
 		Rid          string `json:"rid"`
-		Role         int    `json:"role"` //1:学生，2:辅导，4:授课，3:旁听用户，5:游客
+		Role         int    `json:"role"` //
 		Ulevel       int    `json:"ulevel"`
 		Uname        int    `json:"uname"`
 		Classid      string `json:"classid"`
@@ -237,7 +237,7 @@ func (c *ClientConnector) SyncChatEnterConnectorRequest(ctx context.Context) err
 
 		Rtype:        c.channelId,
 		Rid:          c.roomId,
-		Role:         1, //1:学生，2:辅导，4:授课，3:旁听用户，5:游客
+		Role:         1, //
 		Ulevel:       1,
 		Classid:      c.roomId,
 		Mtcv:         "0.0.1",
